@@ -1,13 +1,21 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 import os
 
-from .models import Brand, Topic, AIEngine, get_session, engine as db_engine
+from .models import Brand, Topic, AIEngine, get_session, init_db
 from . import analytics
 
-app = FastAPI(title="AEO Platform", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()  # creates tables if they don't exist; safe to call repeatedly
+    yield
+
+
+app = FastAPI(title="AEO Platform", version="0.1.0", lifespan=lifespan)
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 

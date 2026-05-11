@@ -1,0 +1,118 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REPOSITORY: aeo
+
+jobs:
+  # ── Step 1: Apply infrastructure changes ─────────────────────────────────────
+  terraform:
+    name: terraform apply
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    outputs:
+      ecr_url: ${{ steps.outputs.outputs.ecr_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.7"
+          terraform_wrapper: false  # needed for clean output capture
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+
+      - name: Capture outputs
+        id: outputs
+        run: echo "ecr_url=$(terraform output -raw ecr_repository_url)" >> "$GITHUB_OUTPUT"
+
+  # ── Step 2: Build and push container image ────────────────────────────────────
+  build:
+    name: docker build & push
+    runs-on: ubuntu-latest
+    needs: terraform
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image metadata
+        id: meta
+        run: |
+          ECR_URL="${{ needs.terraform.outputs.ecr_url }}"
+          SHA="${{ github.sha }}"
+          echo "image=${ECR_URL}:${SHA}" >> "$GITHUB_OUTPUT"
+          echo "latest=${ECR_URL}:latest" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        run: |
+          docker build -t "${{ steps.meta.outputs.image }}" .
+          docker tag "${{ steps.meta.outputs.image }}" "${{ steps.meta.outputs.latest }}"
+          docker push "${{ steps.meta.outputs.image }}"
+          docker push "${{ steps.meta.outputs.latest }}"
+
+  # ── Step 3: Deploy new image to ECS ──────────────────────────────────────────
+  deploy:
+    name: ecs deploy
+    runs-on: ubuntu-latest
+    needs: [terraform, build]
+
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Force new ECS deployment
+        run: |
+          aws ecs update-service \
+            --cluster aeo \
+            --service aeo \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Wait for deployment to stabilize
+        run: |
+          aws ecs wait services-stable \
+            --cluster aeo \
+            --services aeo \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Confirm deployment
+        run: |
+          echo "Deployed ${{ needs.build.outputs.image }}"
+          echo "Live at https://aeo.alsotheseer.com"

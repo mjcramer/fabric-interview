@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from sqlalchemy import (
     create_engine, Column, Integer, String, Float, DateTime,
@@ -5,8 +6,15 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, relationship, Session
 
-DATABASE_URL = "sqlite:///./aeo.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+# Falls back to SQLite for local dev; production sets DATABASE_URL to postgres://...
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./aeo.db")
+
+_is_sqlite = DATABASE_URL.startswith("sqlite")
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False} if _is_sqlite else {},
+    pool_pre_ping=True,  # handles stale connections after RDS failover
+)
 
 
 class Base(DeclarativeBase):

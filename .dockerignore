@@ -1,0 +1,10 @@
+__pycache__
+*.pyc
+*.pyo
+.env
+aeo.db
+*.db
+.git
+.github
+infra/
+*.md
