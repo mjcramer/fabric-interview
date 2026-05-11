@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AEO Platform</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117; --surface: #1a1d27; --surface2: #22263a; --border: #2e3250;
+      --accent: #6366f1; --accent2: #22d3ee; --text: #e2e8f0; --muted: #8892a4;
+      --green: #22c55e; --yellow: #eab308; --red: #ef4444; --orange: #f97316;
+    }
+
+    body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; font-size: 14px; line-height: 1.5; }
+
+    .app { display: flex; min-height: 100vh; }
+    .sidebar { width: 224px; background: var(--surface); border-right: 1px solid var(--border); padding: 24px 0; flex-shrink: 0; display: flex; flex-direction: column; }
+    .main { flex: 1; overflow-y: auto; padding: 32px; }
+
+    .logo { font-size: 16px; font-weight: 700; color: var(--text); padding: 0 20px 24px; border-bottom: 1px solid var(--border); letter-spacing: -0.5px; }
+    .logo span { color: var(--accent); }
+    .nav-section { padding: 16px 0 4px; }
+    .nav-label { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; padding: 0 20px 8px; }
+    .nav-item { display: flex; align-items: center; gap: 8px; padding: 8px 20px; color: var(--muted); cursor: pointer; border-left: 3px solid transparent; transition: all 0.15s; font-size: 13px; }
+    .nav-item:hover { color: var(--text); background: var(--surface2); }
+    .nav-item.active { color: var(--text); border-left-color: var(--accent); background: rgba(99,102,241,0.08); }
+    .nav-icon { font-size: 14px; width: 18px; text-align: center; }
+
+    .controls { display: flex; gap: 12px; align-items: center; margin-bottom: 28px; flex-wrap: wrap; }
+    .controls select, .controls input[type="text"] {
+      background: var(--surface); border: 1px solid var(--border); color: var(--text);
+      padding: 8px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; outline: none;
+    }
+    .controls select:focus, .controls input[type="text"]:focus { border-color: var(--accent); }
+    .controls input[type="text"] { flex: 1; min-width: 260px; cursor: text; }
+    .btn { padding: 8px 16px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn:hover { opacity: 0.9; }
+
+    .page-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .page-sub { color: var(--muted); margin-bottom: 24px; font-size: 13px; }
+
+    /* ── Visibility Score ── */
+    .score-hero { display: flex; align-items: center; gap: 32px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 24px 28px; margin-bottom: 24px; }
+    .score-ring-wrap { position: relative; width: 100px; height: 100px; flex-shrink: 0; }
+    .score-ring-wrap canvas { position: absolute; top: 0; left: 0; }
+    .score-ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .score-num { font-size: 26px; font-weight: 800; }
+    .score-grade { font-size: 11px; color: var(--muted); font-weight: 600; }
+    .score-components { display: flex; gap: 20px; flex-wrap: wrap; }
+    .score-comp { text-align: center; }
+    .score-comp-val { font-size: 18px; font-weight: 700; }
+    .score-comp-lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+    .score-meta { margin-left: auto; text-align: right; }
+    .score-meta p { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+    /* ── Cards ── */
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
+    .card-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+    .card-value { font-size: 26px; font-weight: 700; }
+    .card-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .card-value.green { color: var(--green); } .card-value.yellow { color: var(--yellow); } .card-value.accent { color: var(--accent); }
+
+    /* ── Panels ── */
+    .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 24px; }
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+    .panel.wide { grid-column: 1 / -1; }
+    .panel-title { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 16px; }
+
+    /* ── Table ── */
+    .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 24px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 10px 16px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 1px solid var(--border); }
+    td { padding: 11px 16px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface2); }
+
+    .sov-bar { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; min-width: 60px; }
+    .sov-fill { height: 100%; border-radius: 3px; background: var(--accent); }
+
+    /* ── Pills & Badges ── */
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .pill.pos  { background: rgba(34,197,94,0.15);  color: var(--green); }
+    .pill.neu  { background: rgba(148,163,184,0.15); color: var(--muted); }
+    .pill.neg  { background: rgba(239,68,68,0.15);   color: var(--red); }
+    .pill.high { background: rgba(239,68,68,0.15);   color: var(--red); }
+    .pill.med  { background: rgba(234,179,8,0.15);   color: var(--yellow); }
+    .pill.low  { background: rgba(148,163,184,0.15); color: var(--muted); }
+    .pill.com  { background: rgba(99,102,241,0.15);  color: var(--accent); }
+    .pill.inf  { background: rgba(34,211,238,0.15);  color: var(--accent2); }
+    .pill.nav  { background: rgba(34,197,94,0.15);   color: var(--green); }
+
+    .engine-badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; background: var(--surface2); color: var(--muted); }
+
+    /* ── Recommendation cards ── */
+    .rec-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+    .rec-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; display: flex; gap: 16px; align-items: flex-start; }
+    .rec-card.border-high { border-left: 3px solid var(--red); }
+    .rec-card.border-medium { border-left: 3px solid var(--yellow); }
+    .rec-card.border-low { border-left: 3px solid var(--muted); }
+    .rec-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+    .rec-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .rec-body { font-size: 13px; color: var(--muted); line-height: 1.55; }
+    .rec-meta { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+    /* ── Explore ── */
+    .explore-bar { display: flex; gap: 10px; margin-bottom: 28px; }
+    .explore-bar input { flex: 1; font-size: 15px; padding: 10px 16px; }
+    .explore-result { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .explore-result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+    .explore-result-query { font-size: 15px; font-weight: 600; }
+    .citation-row { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+    .citation-row:last-child { border-bottom: none; }
+    .citation-pos { width: 24px; height: 24px; border-radius: 50%; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+    .citation-body { flex: 1; }
+    .citation-brand { font-weight: 600; font-size: 13px; }
+    .citation-excerpt { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.5; }
+    .citation-url { font-size: 11px; color: var(--accent2); font-family: monospace; margin-top: 3px; }
+    .no-results { color: var(--muted); text-align: center; padding: 60px; font-size: 15px; }
+
+    .loading { color: var(--muted); text-align: center; padding: 60px; font-size: 15px; }
+
+    @media (max-width: 900px) { .panels { grid-template-columns: 1fr; } .panel.wide { grid-column: 1; } }
+    @media (max-width: 640px) { .sidebar { display: none; } .main { padding: 20px; } }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo">AEO <span>Platform</span></div>
+    <div class="nav-section">
+      <div class="nav-label">Monitor</div>
+      <div class="nav-item active" onclick="navigate('overview')"><span class="nav-icon">◎</span> Overview</div>
+      <div class="nav-item" onclick="navigate('sov')"><span class="nav-icon">⬡</span> Share of Voice</div>
+      <div class="nav-item" onclick="navigate('queries')"><span class="nav-icon">≡</span> Top Queries</div>
+      <div class="nav-item" onclick="navigate('engines')"><span class="nav-icon">⚡</span> Engine Breakdown</div>
+      <div class="nav-item" onclick="navigate('pages')"><span class="nav-icon">⬡</span> Top Pages</div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Activate</div>
+      <div class="nav-item" onclick="navigate('gaps')"><span class="nav-icon">△</span> Content Gaps</div>
+      <div class="nav-item" onclick="navigate('recs')"><span class="nav-icon">★</span> Recommendations</div>
+      <div class="nav-item" onclick="navigate('explore')"><span class="nav-icon">⌕</span> Prompts Explorer</div>
+    </div>
+  </aside>
+
+  <main class="main" id="main">
+    <div class="loading">Loading data…</div>
+  </main>
+</div>
+
+<script>
+const state = {
+  page: 'overview', brandId: null, topicId: null, engineId: null,
+  days: 30, brands: [], topics: [], engines: [],
+};
+
+async function api(path) {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`API error ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+function qs(params) {
+  const p = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v != null) p.set(k, v); });
+  const s = p.toString();
+  return s ? '?' + s : '';
+}
+
+async function init() {
+  const [brands, topics, engines] = await Promise.all([
+    api('/api/brands'), api('/api/topics'), api('/api/engines')
+  ]);
+  state.brands  = brands;
+  state.topics  = topics;
+  state.engines = engines;
+  state.brandId = brands[0]?.id;
+  state.topicId = topics[0]?.id;
+  await render();
+}
+
+const PAGE_KEYS = {
+  overview: 'overview', sov: 'share of voice', queries: 'top queries',
+  engines: 'engine breakdown', pages: 'top pages',
+  gaps: 'content gaps', recs: 'recommendations', explore: 'prompts explorer',
+};
+
+function navigate(page) {
+  state.page = page;
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.textContent.trim().toLowerCase() === PAGE_KEYS[page]);
+  });
+  render();
+}
+
+// ── Controls ──────────────────────────────────────────────────────────────────
+function controlsBar({ showBrand=true, showTopic=false, showEngine=false } = {}) {
+  const brandSel = showBrand ? `
+    <select onchange="state.brandId=+this.value; render()">
+      ${state.brands.map(b => `<option value="${b.id}" ${b.id===state.brandId?'selected':''}>${b.name}</option>`).join('')}
+    </select>` : '';
+  const topicSel = showTopic ? `
+    <select onchange="state.topicId=+this.value; render()">
+      ${state.topics.map(t => `<option value="${t.id}" ${t.id===state.topicId?'selected':''}>${t.name}</option>`).join('')}
+    </select>` : '';
+  const engSel = showEngine ? `
+    <select onchange="state.engineId=this.value?+this.value:null; render()">
+      <option value="">All engines</option>
+      ${state.engines.map(e => `<option value="${e.id}" ${e.id===state.engineId?'selected':''}>${e.name}</option>`).join('')}
+    </select>` : '';
+  const daysSel = `
+    <select onchange="state.days=+this.value; render()">
+      ${[7,14,30,60,90].map(d => `<option value="${d}" ${d===state.days?'selected':''}>${d}d</option>`).join('')}
+    </select>`;
+  return `<div class="controls">${brandSel}${topicSel}${engSel}${daysSel}</div>`;
+}
+
+// ── Shared chart defaults ──────────────────────────────────────────────────────
+function chartOpts({ yLabel='', yMax=null } = {}) {
+  return {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { color: '#8892a4', maxTicksLimit: 10 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+      y: { ticks: { color: '#8892a4' }, grid: { color: 'rgba(255,255,255,0.04)' }, ...(yMax!=null?{max:yMax}:{}) },
+    },
+  };
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const urlPath = url => { try { return new URL(url).pathname; } catch { return url; } };
+const intentPill = i => ({commercial:'<span class="pill com">commercial</span>', informational:'<span class="pill inf">informational</span>', navigational:'<span class="pill nav">navigational</span>'}[i] || i);
+const scoreColor = s => s >= 80 ? '#22c55e' : s >= 65 ? '#22d3ee' : s >= 50 ? '#eab308' : '#ef4444';
+
+// ── Feature 1: Visibility Score ring ─────────────────────────────────────────
+function drawScoreRing(canvasId, score) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      datasets: [{
+        data: [score, 100 - score],
+        backgroundColor: [scoreColor(score), 'rgba(255,255,255,0.05)'],
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      cutout: '78%', responsive: false,
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      animation: { duration: 600 },
+    },
+  });
+}
+
+// ── Page: Overview ────────────────────────────────────────────────────────────
+async function renderOverview() {
+  const [overview, vscore, trend, sentiment, byIntent] = await Promise.all([
+    api(`/api/brands/${state.brandId}/overview${qs({days:state.days})}`),
+    api(`/api/brands/${state.brandId}/visibility-score${qs({days:state.days})}`),
+    api(`/api/brands/${state.brandId}/trend${qs({days:state.days})}`),
+    api(`/api/brands/${state.brandId}/sentiment${qs({days:state.days})}`),
+    api(`/api/brands/${state.brandId}/by-intent${qs({days:state.days})}`),
+  ]);
+  const brand = state.brands.find(b => b.id === state.brandId);
+
+  document.getElementById('main').innerHTML = `
+    <div class="page-title">${brand.name}</div>
+    <div class="page-sub">${brand.domain} · ${brand.category}</div>
+    ${controlsBar({ showBrand: true })}
+
+    <div class="score-hero">
+      <div class="score-ring-wrap">
+        <canvas id="scoreRing" width="100" height="100"></canvas>
+        <div class="score-ring-center">
+          <div class="score-num" style="color:${scoreColor(vscore.score)}">${vscore.score}</div>
+          <div class="score-grade">Grade ${vscore.grade}</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px">Visibility Score</div>
+        <div class="score-components">
+          ${Object.entries({
+            'Citation Rate': vscore.components.citation_rate,
+            'Position':      vscore.components.position,
+            'Sentiment':     vscore.components.sentiment,
+            'Query Coverage':vscore.components.query_coverage,
+          }).map(([lbl,val]) => `
+            <div class="score-comp">
+              <div class="score-comp-val" style="color:${scoreColor(val)}">${val}</div>
+              <div class="score-comp-lbl">${lbl}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+      <div class="score-meta">
+        <p>Covers ${vscore.queries_covered} of ${vscore.total_queries} queries</p>
+        <p>Last ${state.days} days</p>
+      </div>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-label">Citation Rate</div>
+        <div class="card-value accent">${overview.citation_rate_pct}%</div>
+        <div class="card-sub">of query runs cite this brand</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Total Citations</div>
+        <div class="card-value">${overview.total_citations.toLocaleString()}</div>
+        <div class="card-sub">last ${state.days} days</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Avg Position</div>
+        <div class="card-value ${overview.avg_position<=2?'green':'yellow'}">${overview.avg_position ?? '—'}</div>
+        <div class="card-sub">when cited (lower = better)</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Positive Sentiment</div>
+        <div class="card-value green">${overview.positive_pct}%</div>
+        <div class="card-sub">of citations are positive</div>
+      </div>
+    </div>
+
+    <div class="panels">
+      <div class="panel wide">
+        <div class="panel-title">Citation Rate Over Time</div>
+        <canvas id="trendChart" height="80"></canvas>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Citation Rate by Intent</div>
+        <canvas id="intentChart" height="180"></canvas>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Sentiment Breakdown</div>
+        <canvas id="sentChart" height="180"></canvas>
+      </div>
+    </div>
+  `;
+
+  drawScoreRing('scoreRing', vscore.score);
+
+  new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+      labels: trend.map(r => r.date),
+      datasets: [{
+        label: 'Citation Rate',
+        data: trend.map(r => (r.citation_rate * 100).toFixed(1)),
+        borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.08)',
+        fill: true, tension: 0.4, pointRadius: 2,
+      }]
+    },
+    options: chartOpts({ yLabel: '%', yMax: 100 }),
+  });
+
+  const intentColors = { commercial: '#6366f1', informational: '#22d3ee', navigational: '#22c55e' };
+  new Chart(document.getElementById('intentChart'), {
+    type: 'bar',
+    data: {
+      labels: byIntent.map(r => r.intent),
+      datasets: [{
+        label: 'Citation Rate %',
+        data: byIntent.map(r => r.citation_rate_pct),
+        backgroundColor: byIntent.map(r => intentColors[r.intent] || '#8892a4'),
+        borderRadius: 6,
+      }]
+    },
+    options: chartOpts({ yLabel: '%', yMax: 100 }),
+  });
+
+  new Chart(document.getElementById('sentChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Positive', 'Neutral', 'Negative'],
+      datasets: [{ data: [sentiment.positive, sentiment.neutral, sentiment.negative],
+        backgroundColor: ['#22c55e', '#64748b', '#ef4444'], borderWidth: 0 }]
+    },
+    options: { plugins: { legend: { labels: { color: '#8892a4' } } }, cutout: '65%' },
+  });
+}
+
+// ── Page: Share of Voice ───────────────────────────────────────────────────────
+async function renderSov() {
+  const sov = await api(`/api/topics/${state.topicId}/share-of-voice${qs({days:state.days,engine_id:state.engineId})}`);
+  const topic = state.topics.find(t => t.id === state.topicId);
+  document.getElementById('main').innerHTML = `
+    <div class="page-title">Share of Voice</div>
+    <div class="page-sub">Citation share by brand within a topic</div>
+    ${controlsBar({ showBrand:false, showTopic:true, showEngine:true })}
+    <div class="panels">
+      <div class="panel"><div class="panel-title">Citation Share — ${topic.name}</div><canvas id="sovPie" height="260"></canvas></div>
+      <div class="panel"><div class="panel-title">Citation Volume</div><canvas id="sovBar" height="260"></canvas></div>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Brand</th><th>Citations</th><th>Share of Voice</th><th></th></tr></thead>
+      <tbody>${sov.map(r => `<tr>
+        <td><strong>${r.brand}</strong></td><td>${r.citations.toLocaleString()}</td><td>${r.share}%</td>
+        <td><div class="sov-bar"><div class="sov-fill" style="width:${r.share}%"></div></div></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  `;
+  const colors = ['#6366f1','#22d3ee','#22c55e','#eab308','#f97316','#ec4899','#8b5cf6','#14b8a6'];
+  new Chart(document.getElementById('sovPie'), {
+    type: 'pie',
+    data: { labels: sov.map(r=>r.brand), datasets:[{data:sov.map(r=>r.share),backgroundColor:colors,borderWidth:0}] },
+    options: { plugins:{legend:{position:'right',labels:{color:'#8892a4',boxWidth:12}}} },
+  });
+  new Chart(document.getElementById('sovBar'), {
+    type: 'bar',
+    data: { labels:sov.map(r=>r.brand), datasets:[{label:'Citations',data:sov.map(r=>r.citations),backgroundColor:colors,borderRadius:4}] },
+    options: {...chartOpts({yLabel:'citations'}), indexAxis:'y'},
+  });
+}
+
+// ── Page: Top Queries ─────────────────────────────────────────────────────────
+async function renderQueries() {
+  const queries = await api(`/api/brands/${state.brandId}/top-queries${qs({days:state.days,limit:15})}`);
+  const brand = state.brands.find(b => b.id === state.brandId);
+  document.getElementById('main').innerHTML = `
+    <div class="page-title">Top Queries</div>
+    <div class="page-sub">Queries where ${brand.name} is cited most often</div>
+    ${controlsBar({ showBrand:true })}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Query</th><th>Topic</th><th>Citations</th><th>Runs</th><th>Rate</th></tr></thead>
+      <tbody>${queries.map(r => `<tr>
+        <td style="max-width:380px">${r.query}</td>
+        <td><span class="engine-badge">${r.topic}</span></td>
+        <td>${r.citations}</td><td>${r.runs}</td>
+        <td><div style="display:flex;align-items:center;gap:8px">${(r.rate*100).toFixed(0)}%
+          <div class="sov-bar" style="min-width:60px"><div class="sov-fill" style="width:${(r.rate*100).toFixed(0)}%;background:#22d3ee"></div></div>
+        </div></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  `;
+}
+
+// ── Page: Engine Breakdown ────────────────────────────────────────────────────
+async function renderEngines() {
+  const engines = await api(`/api/brands/${state.brandId}/engines${qs({days:state.days})}`);
+  const brand = state.brands.find(b => b.id === state.brandId);
+  document.getElementById('main').innerHTML = `
+    <div class="page-title">Engine Breakdown</div>
+    <div class="page-sub">How ${brand.name} performs across AI answer engines</div>
+    ${controlsBar({ showBrand:true })}
+    <div class="panels">
+      <div class="panel"><div class="panel-title">Citation Rate by Engine</div><canvas id="engChart" height="240"></canvas></div>
+      <div class="panel"><div class="panel-title">Citation Volume by Engine</div><canvas id="engVolChart" height="240"></canvas></div>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Engine</th><th>Provider</th><th>Citation Rate</th><th>Citations</th><th>Runs</th></tr></thead>
+      <tbody>${engines.map(e => `<tr>
+        <td><strong>${e.engine}</strong></td>
+        <td><span class="pill neu">${e.provider}</span></td>
+        <td>${(e.citation_rate*100).toFixed(1)}%</td>
+        <td>${e.citations.toLocaleString()}</td><td>${e.runs.toLocaleString()}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  `;
+  const colors = ['#6366f1','#22d3ee','#22c55e','#eab308'];
+  new Chart(document.getElementById('engChart'), {
+    type:'bar', data:{labels:engines.map(e=>e.engine),datasets:[{label:'Citation Rate %',data:engines.map(e=>(e.citation_rate*100).toFixed(1)),backgroundColor:colors,borderRadius:6}]},
+    options:chartOpts({yLabel:'%',yMax:100}),
+  });
+  new Chart(document.getElementById('engVolChart'), {
+    type:'bar', data:{labels:engines.map(e=>e.engine),datasets:[{label:'Citations',data:engines.map(e=>e.citations),backgroundColor:colors,borderRadius:6}]},
+    options:chartOpts({yLabel:'count'}),
+  });
+}
+
+// ── Page: Top Pages ───────────────────────────────────────────────────────────
+async function renderPages() {
+  const pages = await api(`/api/brands/${state.brandId}/top-pages${qs({days:state.days,limit:20})}`);
+  const brand = state.brands.find(b => b.id === state.brandId);
+  document.getElementById('main').innerHTML = `
+    <div class="page-title">Top Pages</div>
+    <div class="page-sub">Which ${brand.name} pages AI engines cite most</div>
+    ${controlsBar({ showBrand:true })}
+    <div class="panels">
+      <div class="panel wide"><div class="panel-title">Citation Share by Page (top 10)</div><canvas id="pageChart" height="80"></canvas></div>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Page</th><th>Citations</th><th>Share</th><th>Queries</th><th>Engines</th><th>Avg Position</th></tr></thead>
+      <tbody>${pages.map(p => `<tr>
+        <td style="max-width:360px"><a href="${p.url}" target="_blank" style="color:var(--accent2);text-decoration:none;font-family:monospace;font-size:12px">${urlPath(p.url)}</a></td>
+        <td>${p.citations.toLocaleString()}</td>
+        <td><div style="display:flex;align-items:center;gap:8px">${p.share}%<div class="sov-bar" style="min-width:60px"><div class="sov-fill" style="width:${Math.min(p.share*2,100)}%;background:#22d3ee"></div></div></div></td>
+        <td>${p.query_count}</td><td>${p.engine_count}</td>
+        <td><span class="pill ${p.avg_position<=2?'pos':p.avg_position<=3?'neu':'neg'}">${p.avg_position??'—'}</span></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  `;
+  const top10 = pages.slice(0,10);
+  new Chart(document.getElementById('pageChart'), {
+    type:'bar', indexAxis:'y',
+    data:{labels:top10.map(p=>urlPath(p.url)),datasets:[{label:'Citations',data:top10.map(p=>p.citations),backgroundColor:'rgba(34,211,238,0.6)',borderRadius:4}]},
+    options:{...chartOpts({yLabel:'citations'}),plugins:{legend:{display:false}}},
+  });
+}
+
+// ── Page: Content Gaps ────────────────────────────────────────────────────────
+async function renderGaps() {
+  const [gaps, byIntent] = await Promise.all([
+    api(`/api/brands/${state.brandId}/gaps${qs({days:state.days,limit:25})}`),
+    api(`/api/brands/${state.brandId}/by-intent${qs({days:state.days})}`),
+  ]);
+  const brand = state.brands.find(b => b.id === state.brandId);
+
+  const commercial = gaps.filter(g => g.intent === 'commercial');
+  const informational = gaps.filter(g => g.intent === 'informational');
+
+  document.getElementById('main').innerHTML = `
+    <div class="page-title">Content Gaps</div>
+    <div class="page-sub">Queries where ${brand.name} has zero citations but competitors are present</div>
+    ${controlsBar({ showBrand:true })}
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-label">Total Gaps</div>
+        <div class="card-value" style="color:var(--red)">${gaps.length}</div>
+        <div class="card-sub">queries with zero citations</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Commercial Gaps</div>
+        <div class="card-value" style="color:var(--orange)">${commercial.length}</div>
+        <div class="card-sub">highest revenue impact</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Informational Gaps</div>
+        <div class="card-value yellow">${informational.length}</div>
+        <div class="card-sub">brand awareness opportunities</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Commercial Rate</div>
+        <div class="card-value accent">${byIntent.find(i=>i.intent==='commercial')?.citation_rate_pct ?? 0}%</div>
+        <div class="card-sub">vs. ${byIntent.find(i=>i.intent==='informational')?.citation_rate_pct ?? 0}% informational</div>
+      </div>
+    </div>
+
+    <div class="panels">
+      <div class="panel wide">
+        <div class="panel-title">Top Gaps by Competitor Citation Volume</div>
+        <canvas id="gapChart" height="90"></canvas>
+      </div>
+    </div>
+
+    <div class="table-wrap"><table>
+      <thead><tr><th>Query</th><th>Intent</th><th>Topic</th><th>Competitor Citations</th><th>Gap Score</th></tr></thead>
+      <tbody>${gaps.map(g => `<tr>
+        <td style="max-width:380px">${g.query}</td>
+        <td>${intentPill(g.intent)}</td>
+        <td><span class="engine-badge">${g.topic}</span></td>
+        <td>${g.competitor_citations}</td>
+        <td><div style="display:flex;align-items:center;gap:8px">
+          <span style="color:${g.gap_score>60?'var(--red)':g.gap_score>30?'var(--yellow)':'var(--muted)'};font-weight:600">${g.gap_score}%</span>
+          <div class="sov-bar" style="min-width:60px"><div class="sov-fill" style="width:${Math.min(g.gap_score,100)}%;background:var(--red)"></div></div>
+        </div></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  `;
+
+  const top12 = gaps.slice(0,12);
+  new Chart(document.getElementById('gapChart'), {
+    type:'bar', indexAxis:'y',
+    data:{
+      labels: top12.map(g => g.query.length > 50 ? g.query.slice(0,50)+'…' : g.query),
+      datasets:[{
+        label:'Competitor Citations',
+        data: top12.map(g => g.competitor_citations),
+        backgroundColor: top12.map(g => g.intent==='commercial' ? 'rgba(239,68,68,0.65)' : 'rgba(234,179,8,0.55)'),
+        borderRadius:4,
+      }]
+    },
+    options:{...chartOpts({yLabel:'citations'}),plugins:{legend:{display:false}}},
+  });
+}
+
+// ── Page: Recommendations ─────────────────────────────────────────────────────
+async function renderRecs() {
+  const recs = await api(`/api/brands/${state.brandId}/recommendations${qs({days:state.days})}`);
+  const brand = state.brands.find(b => b.id === state.brandId);
+
+  const typeIcon = {
+    position_opportunity: '↑',
+    engine_gap:           '⚡',
+    content_gap:          '△',
+    sentiment:            '◉',
+    concentration_risk:   '⬡',
+    coverage:             '⬛',
+  };
+
+  const counts = { high: recs.filter(r=>r.priority==='high').length, medium: recs.filter(r=>r.priority==='medium').length, low: recs.filter(r=>r.priority==='low').length };
+
+  document.getElementById('main').innerHTML = `
+    <div class="page-title">Recommendations</div>
+    <div class="page-sub">Actionable improvements for ${brand.name} — prioritized by AEO impact</div>
+    ${controlsBar({ showBrand:true })}
+
+    <div class="cards" style="margin-bottom:28px">
+      <div class="card"><div class="card-label">High Priority</div><div class="card-value" style="color:var(--red)">${counts.high}</div><div class="card-sub">immediate action</div></div>
+      <div class="card"><div class="card-label">Medium Priority</div><div class="card-value yellow">${counts.medium}</div><div class="card-sub">next sprint</div></div>
+      <div class="card"><div class="card-label">Low Priority</div><div class="card-value" style="color:var(--muted)">${counts.low}</div><div class="card-sub">backlog</div></div>
+      <div class="card"><div class="card-label">Total Items</div><div class="card-value">${recs.length}</div><div class="card-sub">recommendations</div></div>
+    </div>
+
+    <div class="rec-list">
+      ${recs.map(r => `
+        <div class="rec-card border-${r.priority}">
+          <div class="rec-icon">${typeIcon[r.type] || '•'}</div>
+          <div style="flex:1">
+            <div class="rec-title">${r.title}</div>
+            <div class="rec-body">${r.body}</div>
+            <div class="rec-meta">
+              <span class="pill ${r.priority==='high'?'high':r.priority==='medium'?'med':'low'}">${r.priority} priority</span>
+              <span class="engine-badge">${r.type.replace(/_/g,' ')}</span>
+              ${r.url ? `<a href="${r.url}" target="_blank" style="font-size:11px;color:var(--accent2);font-family:monospace">${urlPath(r.url)}</a>` : ''}
+              ${r.intent ? intentPill(r.intent) : ''}
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>
+  `;
+}
+
+// ── Page: Prompts Explorer ────────────────────────────────────────────────────
+async function renderExplore(query) {
+  const brand = state.brands.find(b => b.id === state.brandId);
+  const engSel = `
+    <select id="exploreEngine" onchange="state.engineId=this.value?+this.value:null">
+      <option value="">All engines</option>
+      ${state.engines.map(e => `<option value="${e.id}" ${e.id===state.engineId?'selected':''}>${e.name}</option>`).join('')}
+    </select>`;
+
+  document.getElementById('main').innerHTML = `
+    <div class="page-title">Prompts Explorer</div>
+    <div class="page-sub">Enter any query to see how AI engines responded — and who got cited</div>
+
+    <div class="explore-bar">
+      <input type="text" id="exploreInput" placeholder="e.g. best CRM for startups…" value="${query||''}"
+        onkeydown="if(event.key==='Enter') doExplore()" />
+      ${engSel}
+      <button class="btn" onclick="doExplore()">Search</button>
+    </div>
+
+    <div id="exploreResults">
+      ${query ? '<div class="loading">Searching…</div>' : `
+        <div class="no-results">
+          Type a query above and press Search to see citation results across AI engines.
+          <br><br>
+          <span style="color:var(--muted);font-size:13px">Try: "best CRM for small business" · "project management tools" · "what is a knowledge base"</span>
+        </div>`}
+    </div>
+  `;
+
+  if (query) {
+    const data = await api(`/api/explore${qs({q:query, engine_id:state.engineId, days:state.days})}`);
+    const resultsDiv = document.getElementById('exploreResults');
+
+    if (!data.matched || data.results.length === 0) {
+      resultsDiv.innerHTML = `<div class="no-results">No matching queries found for "<strong>${query}</strong>".<br><br>Try a broader term or check the Top Queries view for what's tracked.</div>`;
+      return;
+    }
+
+    const sentIcon = { positive: '▲', neutral: '◆', negative: '▼' };
+    resultsDiv.innerHTML = data.results.map(r => `
+      <div class="explore-result">
+        <div class="explore-result-header">
+          <div class="explore-result-query">${r.matched_query}</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span class="engine-badge">${r.engine}</span>
+            <span style="color:var(--muted);font-size:12px">${r.run_date}</span>
+            ${r.topic ? `<span class="engine-badge">${r.topic}</span>` : ''}
+          </div>
+        </div>
+        ${r.citations.length === 0
+          ? '<div style="color:var(--muted);font-size:13px;padding:8px 0">No brands cited in this response.</div>'
+          : r.citations.map(c => `
+            <div class="citation-row">
+              <div class="citation-pos">${c.position}</div>
+              <div class="citation-body">
+                <div style="display:flex;gap:8px;align-items:center">
+                  <div class="citation-brand">${c.brand}</div>
+                  <span class="pill ${c.sentiment==='positive'?'pos':c.sentiment==='negative'?'neg':'neu'}">${sentIcon[c.sentiment]} ${c.sentiment}</span>
+                </div>
+                <div class="citation-excerpt">${c.excerpt}</div>
+                ${c.source_url ? `<div class="citation-url"><a href="${c.source_url}" target="_blank" style="color:var(--accent2)">${c.source_url}</a></div>` : ''}
+              </div>
+            </div>`).join('')}
+      </div>`).join('');
+  }
+}
+
+function doExplore() {
+  const q = document.getElementById('exploreInput')?.value?.trim();
+  if (q) renderExplore(q);
+}
+
+// ── Router ────────────────────────────────────────────────────────────────────
+async function render() {
+  document.getElementById('main').innerHTML = '<div class="loading">Loading…</div>';
+  try {
+    if      (state.page === 'overview') await renderOverview();
+    else if (state.page === 'sov')      await renderSov();
+    else if (state.page === 'queries')  await renderQueries();
+    else if (state.page === 'engines')  await renderEngines();
+    else if (state.page === 'pages')    await renderPages();
+    else if (state.page === 'gaps')     await renderGaps();
+    else if (state.page === 'recs')     await renderRecs();
+    else if (state.page === 'explore')  await renderExplore('');
+  } catch(e) {
+    document.getElementById('main').innerHTML = `<div class="loading" style="color:#ef4444">Error: ${e.message}</div>`;
+    console.error(e);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
